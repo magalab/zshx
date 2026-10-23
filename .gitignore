@@ -1,0 +1,13 @@
+# Local planning and design notes; keep them out of the published source repo.
+/docs/
+/tmp/
+
+# macOS metadata
+.DS_Store
+
+# Python cache files from the PTY test
+__pycache__/
+*.py[cod]
+
+# Compiled zsh functions
+*.zwc
