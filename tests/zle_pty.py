@@ -55,6 +55,10 @@ HISTFILE={str(self.root / 'history')!r}
 {startup_config}
 print -s -- 'git status --short'
 print -s -- 'go build ./...'
+print -s -- 'vim ~/.zshrc'
+print -s -- 'zshx-old-history-match tail'
+for i in {{1..120}}; do print -s -- "zshx-noise-$i"; done
+print -s -- 'vim ~/.zshrc'
 {vi_binding}
 _zshx_test_forward() {{ zle .forward-char; typeset -gi _ZSHX_TEST_FORWARD_COUNT=$((_ZSHX_TEST_FORWARD_COUNT + 1)); }}
 zle -N forward-char _zshx_test_forward
@@ -255,6 +259,34 @@ def test_emacs_mode():
         )
         if row["cursor"] != len("git status --short"):
             raise AssertionError(f"full acceptance left cursor at the wrong position: {row}")
+
+        session.send(b"\x03")
+        session.drain(0.15)
+        started = time.monotonic()
+        start = len(session.snapshots())
+        session.send("vim")
+        _, row = session.wait_snapshot(
+            lambda item: item["buffer"] == "vim" and item["postdisplay"] == " ~/.zshrc",
+            start=start,
+            label="recent-history suggestion for a command prefix",
+        )
+        session.send(" ~/.")
+        _, row = session.wait_snapshot(
+            lambda item: item["buffer"] == "vim ~/." and item["postdisplay"] == "zshrc",
+            start=start,
+            label="typing through a suggestion preserves its remaining suffix",
+        )
+        lookup_delay = time.monotonic() - started
+        if lookup_delay > 0.25:
+            raise AssertionError(f"recent history suggestion appeared too slowly ({lookup_delay:.3f}s): {row}")
+
+        session.send(b"\x03")
+        session.drain(0.15)
+        session.send("zshx-old-history-match")
+        state = session.wait_probe(
+            lambda item: item.get("BUFFER") == "zshx-old-history-match" and item.get("POSTDISPLAY") == " tail",
+            label="async fallback finds older history matches",
+        )
 
         session.send(b"\x03")
         session.drain(0.15)

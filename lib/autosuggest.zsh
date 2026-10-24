@@ -13,9 +13,12 @@ _zshx_history_find() {
 
   local query=$1 candidate
   local -i query_length=${#1} event=${HISTCMD:-0} scanned=0
+  local -i scan_limit=${2:-${ZSHX_SUGGEST_HISTORY_LIMIT:-2000}}
   typeset -g _ZSHX_FOUND_SUGGESTION=''
 
-  while (( event > 0 && scanned < ${ZSHX_SUGGEST_HISTORY_LIMIT:-2000} )); do
+  (( scan_limit > ZSHX_SUGGEST_HISTORY_LIMIT )) && scan_limit=$ZSHX_SUGGEST_HISTORY_LIMIT
+
+  while (( event > 0 && scanned < scan_limit )); do
     candidate=${history[$event]-}
     if (( ${#candidate} > query_length )) && [[ ${candidate[1,$query_length]} == "$query" ]]; then
       _ZSHX_FOUND_SUGGESTION=$candidate
@@ -171,10 +174,22 @@ _zshx_update_suggestion() {
     return 0
   fi
 
+  if [[ -n $_ZSHX_SUGGESTION_TEXT && $BUFFER == $_ZSHX_SUGGESTION_BUFFER* && $_ZSHX_SUGGESTION_TEXT == $BUFFER* ]]; then
+    _ZSHX_SUGGESTION_BUFFER=$BUFFER
+    _zshx_set_postdisplay
+    return 0
+  fi
+
   POSTDISPLAY=''
   [[ $_ZSHX_REQUEST_BUFFER == $BUFFER ]] && return 0
 
   if [[ $ZSHX_SUGGEST_ASYNC == 1 ]]; then
+    _zshx_close_async_request
+    if _zshx_history_find "$BUFFER" 100; then
+      _zshx_store_suggestion "$BUFFER" "$_ZSHX_FOUND_SUGGESTION"
+      _zshx_set_postdisplay
+      return 0
+    fi
     _zshx_async_request "$BUFFER"
   else
     _zshx_history_find "$BUFFER"
